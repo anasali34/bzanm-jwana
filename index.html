@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SUPER PRO SHOP POS</title>
+
+<style>
+body{font-family:Arial;background:#eef2f7;padding:10px;}
+.box{background:white;padding:10px;border-radius:10px;max-width:750px;margin:auto;}
+input,button{width:100%;padding:10px;margin:5px 0;}
+button{background:#1976d2;color:white;border:none;border-radius:6px;}
+.card{border:1px solid #ddd;padding:10px;margin:5px;border-radius:8px;}
+.hide{display:none;}
+.small{width:auto;padding:5px 10px;}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+
+<h2>🏪 SUPER PRO SHOP POS</h2>
+
+<!-- LOGIN -->
+<div id="loginBox">
+  <input id="user" placeholder="Username">
+  <input id="pass" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+
+<h3 id="roleText"></h3>
+
+<!-- PRODUCT (ADMIN ONLY) -->
+<div id="adminPanel" class="hide">
+  <h3>👑 Admin Panel</h3>
+  <input id="pname" placeholder="Product">
+  <input id="pprice" placeholder="Price">
+  <input id="pstock" placeholder="Stock">
+  <button onclick="addProduct()">Add / Update</button>
+</div>
+
+<!-- SEARCH -->
+<h3>🔎 Search</h3>
+<input id="search" placeholder="Search..." onkeyup="render()">
+
+<!-- PRODUCTS -->
+<div id="plist"></div>
+
+<hr>
+
+<!-- SELL -->
+<h3>🛒 SELL</h3>
+<input id="sname" placeholder="Product name">
+<input id="sqty" placeholder="Qty">
+<button onclick="sell()">Sell</button>
+
+<!-- CREDIT -->
+<h3>💰 CREDIT / QARZ</h3>
+<input id="cname" placeholder="Customer">
+<input id="ctotal" placeholder="Total">
+<input id="cpaid" placeholder="Paid">
+<button onclick="addCredit()">Save Credit</button>
+
+<!-- RECEIPT -->
+<h3>🧾 RECEIPT</h3>
+<div id="receipt"></div>
+
+<!-- SUMMARY -->
+<h3>📊 SUMMARY</h3>
+<p id="summary"></p>
+
+</div>
+</div>
+
+<script>
+
+/* USERS */
+let users=[
+  {u:"admin",p:"1122",role:"admin"},
+  {u:"staff",p:"1133",role:"cashier"}
+];
+
+let role="";
+
+/* DATA */
+let products=JSON.parse(localStorage.getItem("products")||"[]");
+let sales=JSON.parse(localStorage.getItem("sales")||"[]");
+let credits=JSON.parse(localStorage.getItem("credits")||"[]");
+
+/* SAVE */
+function save(){
+  localStorage.setItem("products",JSON.stringify(products));
+  localStorage.setItem("sales",JSON.stringify(sales));
+  localStorage.setItem("credits",JSON.stringify(credits));
+}
+
+/* LOGIN */
+function login(){
+
+  let u=user.value;
+  let p=pass.value;
+
+  let ok=users.find(x=>x.u==u && x.p==p);
+
+  if(!ok){
+    alert("Wrong login ❌");
+    return;
+  }
+
+  role=ok.role;
+
+  loginBox.classList.add("hide");
+  app.classList.remove("hide");
+
+  roleText.innerText="Role: "+role;
+
+  if(role=="admin"){
+    adminPanel.classList.remove("hide");
+  }
+
+  render();
+}
+
+/* ADD PRODUCT (ADMIN ONLY) */
+function addProduct(){
+
+  if(role!="admin"){
+    alert("Only admin ❌");
+    return;
+  }
+
+  let n=pname.value;
+  let p=Number(pprice.value);
+  let s=Number(pstock.value);
+
+  if(!n||isNaN(p)||isNaN(s)) return;
+
+  products.push({name:n,price:p,stock:s});
+  save();
+  render();
+}
+
+/* SELL */
+function sell(){
+
+  let n=sname.value;
+  let q=Number(sqty.value);
+
+  let p=products.find(x=>x.name==n);
+
+  if(!p || q<=0 || p.stock<q){
+    alert("Stock error ❌");
+    return;
+  }
+
+  p.stock -= q;
+
+  let total = p.price * q;
+
+  sales.push({
+    name:n,
+    qty:q,
+    total,
+    date:new Date().toLocaleString(),
+    by:role
+  });
+
+  showReceipt(n,q,total);
+  save();
+  render();
+}
+
+/* CREDIT */
+function addCredit(){
+
+  let name=cname.value;
+  let total=Number(ctotal.value);
+  let paid=Number(cpaid.value);
+
+  if(!name||isNaN(total)||isNaN(paid)) return;
+
+  credits.push({
+    name,
+    total,
+    paid,
+    remain:total-paid,
+    by:role
+  });
+
+  save();
+  render();
+}
+
+/* RECEIPT */
+function showReceipt(n,q,t){
+
+  receipt.innerHTML=`
+    <div class="card">
+      <h3>🧾 INVOICE</h3>
+      <p>Product: ${n}</p>
+      <p>Qty: ${q}</p>
+      <p>Total: $${t}</p>
+      <p>Date: ${new Date().toLocaleString()}</p>
+      <p>By: ${role}</p>
+      <button onclick="window.print()">Print 🖨</button>
+    </div>
+  `;
+}
+
+/* SUMMARY */
+function getTotalSales(){
+  return sales.reduce((a,b)=>a+b.total,0);
+}
+
+/* RENDER */
+function render(){
+
+  let q = search.value?.toLowerCase() || "";
+
+  /* PRODUCTS */
+  plist.innerHTML="";
+
+  products
+  .filter(p=>p.name.toLowerCase().includes(q))
+  .forEach(p=>{
+
+    plist.innerHTML+=`
+      <div class="card">
+        <h4>${p.name}</h4>
+        <p>Price: $${p.price}</p>
+        <p>Stock: ${p.stock}</p>
+      </div>
+    `;
+  });
+
+  /* SUMMARY */
+  summary.innerHTML=`
+    💰 Sales: $${getTotalSales()} <br>
+    📦 Products: ${products.length} <br>
+    🧾 Transactions: ${sales.length} <br>
+    💳 Credits: ${credits.length}
+  `;
+}
+
+render();
+
+</script>
+
+</body>
+</html>
